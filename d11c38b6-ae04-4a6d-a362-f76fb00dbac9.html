@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Artist Content Calendar</title>
+  <style>
+    :root{
+      --bg: #ffffff;
+      --ink: #1f2937; /* slate-800 */
+      --muted: #6b7280; /* gray-500 */
+      --accent: #e6f3ff; /* light blue */
+      --accent-ink:#0b4a6f;
+      --chip-bg:#eef6ff;
+      --chip-ink:#0b4a6f;
+      --today:#c9e8ff;
+      --border:#e5e7eb;
+      --shadow: 0 10px 25px rgba(0,0,0,0.06);
+      --radius: 16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background:var(--bg); color:var(--ink);
+    }
+    .container{max-width:1100px; margin:20px auto; padding:16px}
+    .app{
+      background:#fff; border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    header{
+      display:flex; flex-wrap:wrap; align-items:center; gap:12px; justify-content:space-between; padding:16px 20px;
+      border-bottom:1px solid var(--border);
+      background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+    }
+    .title{
+      display:flex; align-items:center; gap:12px;
+    }
+    .title h1{margin:0; font-size:20px}
+    .sub{color:var(--muted); font-size:14px}
+    .controls{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+    button, .btn{
+      appearance:none; border:1px solid var(--border); background:#fff; color:var(--ink);
+      padding:8px 12px; border-radius:12px; cursor:pointer; font-weight:600;
+    }
+    .btn-icon{padding:8px 10px}
+    .btn.primary{background:#0ea5e9; border-color:#0ea5e9; color:white}
+    .toggle{display:flex; background:#f3f4f6; border-radius:12px; padding:4px}
+    .toggle button{border:none; background:transparent; padding:8px 12px; border-radius:8px; color:var(--muted)}
+    .toggle button.active{background:#fff; color:var(--ink); box-shadow: var(--shadow)}
+
+    .calendar{
+      padding: 16px; display:none;
+    }
+    .calendar.active{display:block}
+
+    .grid{
+      display:grid; grid-template-columns: repeat(7, 1fr); gap:10px;
+    }
+    .dow{font-size:12px; color:var(--muted); text-align:center; margin-bottom:8px}
+
+    .cell{
+      background:var(--accent); border:1px solid #dbeafe; border-radius:14px; padding:10px; min-height:112px;
+      display:flex; flex-direction:column; gap:6px; position:relative;
+      transition: transform .05s ease;
+    }
+    .cell:hover{transform:translateY(-1px)}
+    .cell.out{opacity:.45; background:#f7fbff}
+    .date-num{font-weight:800; font-size:14px; color:var(--accent-ink)}
+    .chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:auto}
+    .chip{background:var(--chip-bg); color:var(--chip-ink); border-radius:999px; padding:4px 8px; font-size:11px; border:1px solid #dbeafe}
+    .ig{display:flex; align-items:center; gap:6px; font-size:12px; background:#fff; border:1px dashed #cfe8ff; padding:6px 8px; border-radius:10px}
+    .ig strong{font-size:12px}
+
+    .monthbar{display:grid; grid-template-columns: repeat(7, 1fr); gap:10px; margin-bottom:8px}
+    .legend{display:flex; gap:10px; align-items:center}
+    .legend span{font-size:12px; color:var(--muted)}
+    .legend .dot{width:10px; height:10px; display:inline-block; border-radius:50%}
+    .dot.event{background:#93c5fd}
+    .dot.ig{background:#fef9c3; border:1px solid #fde68a}
+
+    .todayTag{position:absolute; top:8px; right:8px; font-size:10px; background:var(--today); border:1px solid #b1dcff; padding:3px 6px; border-radius:999px; font-weight:700}
+
+    /* Detail Drawer */
+    dialog{border:none; border-radius:16px; width:min(680px, 92vw); padding:0; box-shadow: 0 25px 60px rgba(2,6,23,.25)}
+    .drawer{padding:16px 18px 18px}
+    .drawer h3{margin:0 0 6px}
+    .drawer .meta{color:var(--muted); font-size:13px; margin-bottom:12px}
+    .drawer .row{display:flex; gap:10px; align-items:flex-start; background:#f9fbff; border:1px solid #e6efff; padding:10px; border-radius:10px}
+    .drawer .row .label{min-width:130px; font-weight:700; color:#0b4a6f}
+    .drawer .row .val{white-space:pre-wrap}
+    .drawer footer{display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid var(--border); background:#fafafa; border-radius:0 0 16px 16px}
+
+    @media (max-width:720px){
+      .cell{min-height:96px}
+      .legend{display:none}
+      header{gap:8px}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="app">
+      <header>
+        <div class="title">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M7 2v3M17 2v3M3.5 9h17M4 6h16a1 1 0 0 1 1 1v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a1 1 0 0 1 1-1Z" stroke="#0ea5e9" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <div>
+            <h1>Artist Content Calendar</h1>
+            <div class="sub" id="subLabel">Monthly view</div>
+          </div>
+        </div>
+        <div class="controls">
+          <div>
+            <button class="btn-icon" id="prevBtn" title="Previous">⟨</button>
+            <button class="btn-icon" id="todayBtn" title="Jump to Today">Today</button>
+            <button class="btn-icon" id="nextBtn" title="Next">⟩</button>
+          </div>
+          <div class="toggle" role="tablist" aria-label="View switcher">
+            <button id="monthTab" class="active" role="tab" aria-selected="true">Month</button>
+            <button id="weekTab" role="tab" aria-selected="false">Week</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="calendar active" id="monthView" aria-labelledby="monthTab">
+        <div class="monthbar">
+          <div class="dow">Sun</div>
+          <div class="dow">Mon</div>
+          <div class="dow">Tue</div>
+          <div class="dow">Wed</div>
+          <div class="dow">Thu</div>
+          <div class="dow">Fri</div>
+          <div class="dow">Sat</div>
+        </div>
+        <div class="grid" id="monthGrid"></div>
+        <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center; padding:6px 2px 16px 2px">
+          <div class="legend">
+            <span><i class="dot event"></i> Event/Release</span>
+            <span><i class="dot ig"></i> Instagram Post</span>
+          </div>
+          <div id="monthLabel" class="sub"></div>
+        </div>
+      </section>
+
+      <section class="calendar" id="weekView" aria-labelledby="weekTab">
+        <div class="monthbar">
+          <div class="dow">Sun</div>
+          <div class="dow">Mon</div>
+          <div class="dow">Tue</div>
+          <div class="dow">Wed</div>
+          <div class="dow">Thu</div>
+          <div class="dow">Fri</div>
+          <div class="dow">Sat</div>
+        </div>
+        <div class="grid" id="weekGrid"></div>
+        <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center; padding:6px 2px 16px 2px">
+          <div></div>
+          <div id="weekLabel" class="sub"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <dialog id="detail">
+    <div class="drawer">
+      <h3 id="dTitle">Details</h3>
+      <div class="meta" id="dMeta"></div>
+      <div class="row" style="margin-bottom:8px">
+        <div class="label">Event/Release</div>
+        <div class="val" id="dEvent">—</div>
+      </div>
+      <div class="row">
+        <div class="label">Instagram Post</div>
+        <div class="val" id="dIG">—</div>
+      </div>
+    </div>
+    <footer>
+      <button class="btn" id="closeDetail">Close</button>
+    </footer>
+  </dialog>
+
+  <script>
+    // --- Data ---------------------------------------------------------------
+    const rawData = `
+10/14/2025,/Tuesday/,,
+10/15/2025,/Wednesday/,,
+10/16/2025,/Thursday/,,
+10/17/2025,/Friday/,,
+10/18/2025,/Saturday/,,
+10/19/2025,/Sunday/,,
+10/20/2025,/Monday/,,
+10/21/2025,/Tuesday/,,
+10/22/2025,/Wednesday/,,
+10/23/2025,/Thursday/,,
+10/24/2025,/Friday/,Halloween Weekend,,
+10/25/2025,/Saturday/,Halloween Weekend,,
+10/26/2025,/Sunday/,Halloween Weekend,,
+10/27/2025,/Monday/,Assets Due,START OF NEW CAMPAIGN,
+10/28/2025,/Tuesday/,,
+10/29/2025,/Wednesday/,,
+10/30/2025,/Thursday/,,
+10/31/2025,/Friday/,Halloween Weekend,,
+11/1/2025,/Saturday/,Dia De Los Muertos,,
+11/2/2025,/Sunday/,Dia De Los Muertos,,
+11/3/2025,/Monday/,,Fit Pic/Photos pushing song narrative (title or aesthetic),
+11/4/2025,/Tuesday/,,,
+11/5/2025,/Wednesday/,,BTS in studio teasing song (VHS or iphone raw audio),
+11/6/2025,/Thursday/,,,
+11/7/2025,/Friday/,,,
+11/8/2025,/Saturday/,,,
+11/9/2025,/Sunday/,,,
+11/10/2025,/Monday/,,Official Song Snippet,
+11/11/2025,/Tuesday/,,,
+11/12/2025,/Wednesday/,,In Person Activation (posters/billboard/object for song/etc...),
+11/13/2025,/Thursday/,,,
+11/14/2025,/Friday/,SINGLE 2025,Song Release Post,
+11/15/2025,/Saturday/,,IG Live ,
+11/16/2025,/Sunday/,,make song about going to VIVA! Music Festival,
+11/17/2025,/Monday/,,Alternative Version of Song (visual + SoundCloud),
+11/18/2025,/Tuesday/,,,
+11/19/2025,/Wednesday/,,Song Breakdown 30 Sec Video,
+11/20/2025,/Thursday/,,Club Video/Car Video/Lifestyle/Slow Mo Clip of Song,
+11/21/2025,/Friday/,,Fit Pic/Photos pushing song narrative (title or aesthetic),
+11/22/2025,/Saturday/,,VIVA! Music Festival,
+11/23/2025,/Sunday/,,skit BTS of VIVA,
+11/24/2025,/Monday/,,vlog post VIVA!,
+11/25/2025,/Tuesday/,,IG reel performance VIVA - sigamos bailando,
+11/26/2025,/Wednesday/,Assets Due,START OF NEW CAMPAIGN,
+11/27/2025,/Thursday/,,VIVA photo dump,
+11/28/2025,/Friday/,,,
+11/29/2025,/Saturday/,,IG reel performance VIVA - another songs,
+11/30/2025,/Sunday/,,,
+12/1/2025,/Monday/,,,
+12/2/2025,/Tuesday/,,,
+12/3/2025,/Wednesday/,,Fit Pic/Photos pushing song narrative (title or aesthetic),
+12/4/2025,/Thursday/,,,
+12/5/2025,/Friday/,,BTS in studio teasing song (VHS or iphone raw audio),
+12/6/2025,/Saturday/,,,
+12/7/2025,/Sunday/,,,
+12/8/2025,/Monday/,,,
+12/9/2025,/Tuesday/,,,
+12/10/2025,/Wednesday/,,Official Song Snippet,
+12/11/2025,/Thursday/,,,
+12/12/2025,/Friday/,SINGLE 2025,In Person Activation (posters/billboard/object for song/etc...),
+12/13/2025,/Saturday/,,,
+12/14/2025,/Sunday/,,Song Release Post,
+12/15/2025,/Monday/,,IG Live ,
+12/16/2025,/Tuesday/,,,
+12/17/2025,/Wednesday/,,Alternative Version of Song (visual + SoundCloud),
+12/18/2025,/Thursday/,,,
+12/19/2025,/Friday/,,Song Breakdown 30 Sec Video,
+12/20/2025,/Saturday/,,Club Video/Car Video/Lifestyle/Slow Mo Clip of Song,
+12/21/2025,/Sunday/,,Fit Pic/Photos pushing song narrative (title or aesthetic),
+12/22/2025,/Monday/,,,
+12/23/2025,/Tuesday/,Assets Due,START OF NEW CAMPAIGN,
+12/24/2025,/Wednesday/,,,
+12/25/2025,/Thursday/,Christmas,,
+12/26/2025,/Friday/,,,
+12/27/2025,/Saturday/,,,
+12/28/2025,/Sunday/,,,
+12/29/2025,/Monday/,,,
+12/30/2025,/Tuesday/,,Fit Pic/Photos pushing song narrative (title or aesthetic),
+12/31/2025,/Wednesday/,New Years,,
+1/1/2026,/Thursday/,New Years,BTS in studio teasing song (VHS or iphone raw audio),
+1/2/2026,/Friday/,,,
+1/3/2026,/Saturday/,,,
+1/4/2026,/Sunday/,,,
+1/5/2026,/Monday/,,,
+1/6/2026,/Tuesday/,,Official Song Snippet,
+1/7/2026,/Wednesday/,,,
+1/8/2026,/Thursday/,,In Person Activation (posters/billboard/object for song/etc...),
+1/9/2026,/Friday/,SINGLE 2025,,
+1/10/2026,/Saturday/,,Song Release Post,
+1/11/2026,/Sunday/,,IG Live ,
+1/12/2026,/Monday/,,,
+1/13/2026,/Tuesday/,,Alternative Version of Song (visual + SoundCloud),
+1/14/2026,/Wednesday/,,,
+1/15/2026,/Thursday/,,Song Breakdown 30 Sec Video,
+1/16/2026,/Friday/,,Club Video/Car Video/Lifestyle/Slow Mo Clip of Song,
+1/17/2026,/Saturday/,,Fit Pic/Photos pushing song narrative (title or aesthetic),
+1/18/2026,/Sunday/,,,
+1/19/2026,/Monday/,,,
+1/20/2026,/Tuesday/,Assets Due,START OF NEW CAMPAIGN,
+1/21/2026,/Wednesday/,,,
+1/22/2026,/Thursday/,,,
+1/23/2026,/Friday/,,,
+1/24/2026,/Saturday/,,,
+1/25/2026,/Sunday/,,,
+1/26/2026,/Monday/,,,
+1/27/2026,/Tuesday/,,Fit Pic/Photos pushing song narrative (title or aesthetic),
+1/28/2026,/Wednesday/,,,
+1/29/2026,/Thursday/,,BTS in studio teasing song (VHS or iphone raw audio),
+1/30/2026,/Friday/,,,
+1/31/2026,/Saturday/,,,
+2/1/2026,/Sunday/,,,
+2/2/2026,/Monday/,,,
+2/3/2026,/Tuesday/,,Official Song Snippet,
+2/4/2026,/Wednesday/,,,
+2/5/2026,/Thursday/,,In Person Activation (posters/billboard/object for song/etc...),
+2/6/2026,/Friday/,SINGLE 2025,,
+2/7/2026,/Saturday/,,Song Release Post,
+2/8/2026,/Sunday/,,IG Live ,
+2/9/2026,/Monday/,,,
+2/10/2026,/Tuesday/,,Alternative Version of Song (visual + SoundCloud),
+2/11/2026,/Wednesday/,,,
+2/12/2026,/Thursday/,,Song Breakdown 30 Sec Video,
+2/13/2026,/Friday/,,Club Video/Car Video/Lifestyle/Slow Mo Clip of Song,
+2/14/2026,/Saturday/,Valentines Day,Fit Pic/Photos pushing song narrative (title or aesthetic),
+2/15/2026,/Sunday/,,,
+2/16/2026,/Monday/,,,
+2/17/2026,/Tuesday/,Assets Due,START OF NEW CAMPAIGN,
+2/18/2026,/Wednesday/,,,
+2/19/2026,/Thursday/,,,
+2/20/2026,/Friday/,,,
+2/21/2026,/Saturday/,,,
+2/22/2026,/Sunday/,,,
+2/23/2026,/Monday/,,,
+2/24/2026,/Tuesday/,,Fit Pic/Photos pushing song narrative (title or aesthetic),
+2/25/2026,/Wednesday/,,,
+2/26/2026,/Thursday/,,BTS in studio teasing song (VHS or iphone raw audio),
+2/27/2026,/Friday/,,,
+2/28/2026,/Saturday/,,,
+3/1/2026,/Sunday/,,,
+3/2/2026,/Monday/,,,
+3/3/2026,/Tuesday/,,Official Song Snippet,
+3/4/2026,/Wednesday/,,,
+3/5/2026,/Thursday/,,In Person Activation (posters/billboard/object for song/etc...),
+3/6/2026,/Friday/,SINGLE 2025,,
+3/7/2026,/Saturday/,,Song Release Post,
+3/8/2026,/Sunday/,,IG Live ,
+3/9/2026,/Monday/,,,
+3/10/2026,/Tuesday/,,Alternative Version of Song (visual + SoundCloud),
+3/11/2026,/Wednesday/,,,
+3/12/2026,/Thursday/,,Song Breakdown 30 Sec Video,
+3/13/2026,/Friday/,,Club Video/Car Video/Lifestyle/Slow Mo Clip of Song,
+3/14/2026,/Saturday/,,Fit Pic/Photos pushing song narrative (title or aesthetic)
+`;
+
+    function parseCSV(text){
+      return text.trim().split(/\n+/).map(line=>{
+        // We expect 4 columns: date, day, event, ig
+        const parts = line.split(/,(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)/).map(s=>s.trim());
+        const [mdy, , event, ig] = parts; // day-of-week is provided but recomputed from date
+        const [m,d,y] = mdy.split('/').map(n=>parseInt(n,10));
+        const date = new Date(y, m-1, d);
+        return {date, event: (event||'').trim(), ig: (ig||'').trim()};
+      });
+    }
+
+    const records = parseCSV(rawData);
+    // Build quick map for lookups by Y-M-D
+    const key = (d)=> `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const dataMap = new Map(records.map(r=>[key(r.date), r]));
+
+    // State
+    let current = new Date(2025, 9, 1); // default October 2025
+    const today = new Date();
+
+    // Elements
+    const monthGrid = document.getElementById('monthGrid');
+    const weekGrid = document.getElementById('weekGrid');
+    const monthView = document.getElementById('monthView');
+    const weekView = document.getElementById('weekView');
+    const monthTab = document.getElementById('monthTab');
+    const weekTab = document.getElementById('weekTab');
+    const subLabel = document.getElementById('subLabel');
+    const monthLabel = document.getElementById('monthLabel');
+    const weekLabel = document.getElementById('weekLabel');
+
+    // Dialog elements
+    const detail = document.getElementById('detail');
+    const dTitle = document.getElementById('dTitle');
+    const dMeta = document.getElementById('dMeta');
+    const dEvent = document.getElementById('dEvent');
+    const dIG = document.getElementById('dIG');
+    document.getElementById('closeDetail').addEventListener('click', ()=>detail.close());
+
+    // Helpers
+    function startOfMonth(d){return new Date(d.getFullYear(), d.getMonth(), 1)}
+    function endOfMonth(d){return new Date(d.getFullYear(), d.getMonth()+1, 0)}
+    function startOfWeek(d){
+      const s = new Date(d); const day = s.getDay(); // 0 Sun - 6 Sat
+      s.setDate(s.getDate() - day); // start on Sunday for this view
+      s.setHours(0,0,0,0); return s;
+    }
+    function addDays(d,n){const t=new Date(d); t.setDate(t.getDate()+n); return t}
+    const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+    function fmt(d){return `${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`}
+
+    function cellTemplate(d, isOut){
+      const k = key(d);
+      const rec = dataMap.get(k) || {event:"", ig:""};
+      const hasEvent = !!rec.event;
+      const hasIG = !!rec.ig;
+      const todayFlag = sameDate(d, today);
+      const eventChip = hasEvent ? `<span class="chip" title="Event/Release">${rec.event}</span>` : "";
+      const igBlock = hasIG ? `<div class="ig" title="Instagram Post"><strong>IG:</strong><span>${escapeHtml(rec.ig)}</span></div>` : "";
+      return `
+        <div class="cell ${isOut? 'out':''}" data-date="${k}" tabindex="0" role="button" aria-label="${fmt(d)} details">
+          <div class="date-num">${d.getDate()}</div>
+          ${igBlock}
+          <div class="chips">${eventChip}</div>
+          ${todayFlag ? '<div class="todayTag">Today</div>' : ''}
+        </div>
+      `;
+    }
+
+    function renderMonth(d){
+      const first = startOfMonth(d); const last = endOfMonth(d);
+      const start = startOfWeek(first);
+      const weeks = 6; // show 6 weeks grid for consistency
+      monthGrid.innerHTML = "";
+      for(let w=0; w<weeks; w++){
+        for(let i=0;i<7;i++){
+          const day = addDays(start, w*7 + i);
+          const out = day.getMonth() !== d.getMonth();
+          monthGrid.insertAdjacentHTML('beforeend', cellTemplate(day, out));
+        }
+      }
+      monthLabel.textContent = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+      bindCells();
+    }
+
+    function renderWeek(center){
+      const s = startOfWeek(center);
+      weekGrid.innerHTML = "";
+      for(let i=0;i<7;i++){
+        const day = addDays(s, i);
+        weekGrid.insertAdjacentHTML('beforeend', cellTemplate(day, false));
+      }
+      const e = addDays(s,6);
+      weekLabel.textContent = `${monthNames[s.getMonth()]} ${s.getDate()} – ${monthNames[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`;
+      bindCells();
+    }
+
+    function sameDate(a,b){return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate()}
+
+    function escapeHtml(str){return String(str).replace(/[&<>\"]/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[s]))}
+
+    function bindCells(){
+      document.querySelectorAll('.cell').forEach(el=>{
+        el.addEventListener('click', ()=>openDetail(el.dataset.date));
+        el.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); openDetail(el.dataset.date); }});
+      });
+    }
+
+    function openDetail(k){
+      const [Y,M,D] = k.split('-');
+      const d = new Date(+Y, +M-1, +D);
+      const rec = dataMap.get(k) || {event:"", ig:""};
+      dTitle.textContent = monthNames[d.getMonth()] + ' ' + d.getDate();
+      dMeta.textContent = fmt(d);
+      dEvent.textContent = rec.event || '—';
+      dIG.textContent = rec.ig || '—';
+      if(typeof detail.showModal === 'function') detail.showModal(); else detail.setAttribute('open','');
+    }
+
+    // Controls
+    document.getElementById('prevBtn').addEventListener('click', ()=>{
+      if(monthView.classList.contains('active')){
+        current = new Date(current.getFullYear(), current.getMonth()-1, 1);
+        renderMonth(current);
+      }else{
+        current = new Date(current.getFullYear(), current.getMonth(), current.getDate()-7);
+        renderWeek(current);
+      }
+    });
+    document.getElementById('nextBtn').addEventListener('click', ()=>{
+      if(monthView.classList.contains('active')){
+        current = new Date(current.getFullYear(), current.getMonth()+1, 1);
+        renderMonth(current);
+      }else{
+        current = new Date(current.getFullYear(), current.getMonth(), current.getDate()+7);
+        renderWeek(current);
+      }
+    });
+    document.getElementById('todayBtn').addEventListener('click', ()=>{
+      current = new Date();
+      if(monthView.classList.contains('active')) renderMonth(current); else renderWeek(current);
+    });
+
+    monthTab.addEventListener('click', ()=>{
+      monthTab.classList.add('active'); weekTab.classList.remove('active');
+      monthView.classList.add('active'); weekView.classList.remove('active');
+      subLabel.textContent = 'Monthly view';
+      renderMonth(current);
+    });
+    weekTab.addEventListener('click', ()=>{
+      weekTab.classList.add('active'); monthTab.classList.remove('active');
+      weekView.classList.add('active'); monthView.classList.remove('active');
+      subLabel.textContent = 'Weekly view';
+      renderWeek(current);
+    });
+
+    // Initial render (jump to the first month in data if today not within range)
+    const minDate = records[0]?.date || new Date();
+    const maxDate = records[records.length-1]?.date || new Date();
+    if(today < minDate || today > maxDate){ current = new Date(minDate); }
+    renderMonth(current);
+  </script>
+</body>
+</html>
